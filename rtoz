@@ -1,0 +1,61 @@
+#!/bin/sh
+
+show_help() {
+cat << EOF
+rtoz - Convert RAR/CBR and other archive formats into ZIP/CBZ
+
+Dependencies: bsdtar
+
+Usage: bsd-tar [OPTION]... FILE...
+ -h		Show this help
+ -o DIRECTORY	Save ZIP/CBZ files to given path DIRECTORY. Defaults to '.'
+EOF
+exit "$1"
+}
+
+if ! command -v "bsdtar" > /dev/null 2>&1; then
+	echo "Missing dependency: bsdtar" >&2
+	show_help 1
+fi
+
+output_dir="."
+OPTIND=1
+
+while getopts "ho:" opt; do
+	case "$opt" in
+		h)
+			show_help 0
+			;;
+		o)
+			[ -d "$OPTARG" ] || { echo "Directory ${OPTARG} does not exist." >&2 ; exit 1; }
+			output_dir="$OPTARG"
+			;;
+		*)
+			show_help 1 >&2
+			;;
+	esac
+done
+shift $((OPTIND-1))
+
+if [ "$#" -eq 0 ]; then
+	show_help 0
+fi
+
+for file in "$@"; do
+	[ -f "${file}" ] || { echo "${file} not found" >&2 ; exit 1; }
+	filename="${file##*/}"
+	filename_noext="${filename%.*}"
+	extension="$(echo "${file#*.}" | tr '[:upper:]' '[:lower:]')"
+
+	case "$extension" in
+		cbz|cbr|cbt|cb7)
+			out_ext=".cbz"
+			;;
+		*)
+			out_ext=".zip"
+			;;
+	esac
+	output_file="${output_dir}/${filename_noext}${out_ext}"
+	
+	[ -f "${output_file}" ] || bsdtar -acf "${output_file}" "@${file}"
+done
